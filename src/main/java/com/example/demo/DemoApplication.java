@@ -1,11 +1,16 @@
 package com.example.demo;
 
+import java.net.InetAddress;
+import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.cloud.sleuth.Span;
 import org.springframework.cloud.sleuth.SpanAdjuster;
 import org.springframework.cloud.sleuth.SpanName;
 import org.springframework.cloud.sleuth.Tracer;
@@ -19,6 +24,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -36,6 +42,10 @@ public class DemoApplication {
 	// WebClient [Finchley]
 	@Bean WebClient.Builder webClient() {
 		return WebClient.builder();
+	}
+
+	@Bean RestTemplateBuilder restTemplateBuilder() {
+		return new RestTemplateBuilder().rootUri("https://pivotal.io/");
 	}
 
 	// span adjusters [Dalston]
@@ -79,6 +89,7 @@ class S1PController {
 		myService.newSpan("hello");
 		myService.continueSpan(new Foo());
 		myService.async();
+		myService.callPivotal();
 		return myService.callService1();
 	}
 }
@@ -89,11 +100,17 @@ class MyService {
 	private static final Logger log = LoggerFactory.getLogger(MyService.class);
 
 	private final WebClient webClient;
+	private final RestTemplate restTemplate;
+	private final Tracer tracer;
 
-	MyService(WebClient.Builder webClientBuilder) {
+	MyService(WebClient.Builder webClientBuilder,
+			RestTemplateBuilder restTemplateBuilder,
+			Tracer tracer) {
 		this.webClient = webClientBuilder
 				.baseUrl("http://localhost:8081")
 				.build();
+		this.restTemplate = restTemplateBuilder.build();
+		this.tracer = tracer;
 	}
 
 	// annotation [Dalston]
@@ -115,6 +132,22 @@ class MyService {
 		return webClient.get().uri("/start")
 				.retrieve()
 				.bodyToMono(String.class);
+	}
+
+	@NewSpan("calling_pivotal")
+	public void callPivotal() throws Exception {
+		Span pivotalSpan = tracer.getCurrentSpan();
+		tracer.addTag("lc", "pivotal");
+		pivotalSpan.logEvent(Span.CLIENT_SEND);
+		try {
+			restTemplate.getForObject("/", String.class);
+		} finally {
+			tracer.addTag("peer.service", "pivotal");
+			tracer.addTag("peer.ipv4",
+					InetAddress.getByName("pivotal.io").getHostAddress() );
+			tracer.addTag("peer.port", "80");
+			pivotalSpan.logEvent(Span.CLIENT_RECV);
+		}
 	}
 
 	@Async
