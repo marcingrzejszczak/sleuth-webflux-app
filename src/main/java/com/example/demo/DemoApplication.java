@@ -134,6 +134,7 @@ class MyService {
 				.bodyToMono(String.class);
 	}
 
+	// Peer services [Dalston]
 	@NewSpan("calling_pivotal")
 	public void callPivotal() throws Exception {
 		Span pivotalSpan = tracer.getCurrentSpan();
@@ -150,6 +151,7 @@ class MyService {
 		}
 	}
 
+	// naming asyncs [Edgware]
 	@Async
 	@SpanName("i_am_async")
 	public void async() throws Exception {
