@@ -56,9 +56,9 @@ $ http localhost:8765/s1p X-B3-Flags:1
 - Reactor Support
 * tracing context passed through Flux
 - Zipkin2 Support
-* change starter-zipkin to starter-zipkin2
+* `starter-zipkin` now points to Zipkin2
 - Deprecation of Stream server
-* migrate to Zipkin2
+* migrate to Zipkin2 with rabbit
 
 === Finchley
 
